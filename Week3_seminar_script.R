@@ -54,7 +54,6 @@ qqline(post_clean_div_pred$total_abundance)
 
 # Let's get the skewnewss coeffient for all the continous response variables.
 
-
 skewness(post_clean_div_pred$total_abundance, na.rm = TRUE)
 kurtosis(post_clean_div_pred$total_abundance,na.rm = TRUE)
 
@@ -218,6 +217,7 @@ summary(bx_model_transformed)
 shapiro.test(residuals(bx_model_transformed))
 qqnorm(residuals(bx_model_transformed)); qqline(residuals(bx_model_transformed))
 
+car::qqp(residuals(bx_model_transformed))
 
 # When examining the output of the lm we get a significant negative association between total abundance and lidar dsm 60.
 # The Shapiro-wilk test is telling us that althrough our data is close to normal (W=0.977) p-values is 0.6739 which means that we
@@ -236,9 +236,19 @@ qqnorm(residuals(bx_model_transformed)); qqline(residuals(bx_model_transformed))
 
 #5a) Fit a poisson regression model & a NB regression model to our data.
 
-p_model <- glm(total_abundance ~ lidar_dsm_60, family = "poisson", data = post_clean_div_pred)
+p_model <- glm(total_abundance ~ lidar_dsm_60, 
+               family = "poisson", 
+               data = post_clean_div_pred)
+summary(p_model)
 
-nb_model <- glm.nb(total_abundance ~ lidar_dsm_60, data = post_clean_div_pred)
+
+nb_model <- glm.nb(total_abundance ~ lidar_dsm_60, 
+                   link = log,
+                   data = post_clean_div_pred)
+summary(nb_model)
+
+
+
 
 ### 5b Gather evidence as to which staistical model is best.
 
@@ -269,12 +279,30 @@ plot <- ggplot(post_clean_div_pred,
   labs(
     title = "Relationship between Lidar Estimated Shrub Volume Loss and Total Post-fire Seedbank Abundance",
     x = "Lidar DSM 60",
-    y = "Total Seedling Abundance"
+    y = "Untransformed Total Seedling Abundance"
   ) +
   theme_minimal()
 
 print(plot)
 
 #
+
+
+
+plot <- ggplot(post_clean_div_pred, 
+               aes(x = lidar_dsm_60, y = abundance_bx)) +
+  geom_point() +
+  labs(
+    title = "Relationship between Lidar Estimated Shrub Volume Loss and Total Post-fire Seedbank Abundance",
+    x = "Lidar DSM 60",
+    y = "Transformed Total Seedling Abundance"
+  ) +
+  theme_minimal()
+
+print(plot)
+
+#
+
+
 
 
