@@ -1,0 +1,210 @@
+---
+title: "week3 - Normalizing Data"
+author: "Laura Dagg"
+format: html
+editor: visual
+---
+
+1.  Load in the data and packages
+
+```{r}
+install.packages("ggpubr")
+install.packages("MASS")
+
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(moments)
+library(lme4)
+library(MASS)
+
+post_clean_div_pred <- read_excel("post_clean_div_pred.xlsx")
+View(post_clean_div_pred)
+
+```
+
+2.  Examine the skew of the data, let's look at total abundance !
+
+```{r}
+# Let's create histograms for all of the continuous response variables total, native, non-native species richness and total abundance. This will tell us if our data is postive or negative skewed.
+
+untransformed_total_a <- ggplot(post_clean_div_pred,aes(x=total_abundance)) +
+  geom_histogram(binwidth = 2,
+                fill = 'cornflowerblue',
+                color = 'black') +
+      labs(title = "Histogram of Total Abundance",
+           x= "total abundance",
+           y = 'Count')+
+             theme_minimal()
+           
+print(untransformed_total_a)
+
+# lets impose what a normal distribution, red dashed line, looks like over our data, blue solid line. 
+
+ggarrange(
+  ggdensity(
+    post_clean_div_pred$total_abundance, 
+    color = "blue",
+    title = "untransformed total abundance") +
+           stat_overlay_normal_density(
+             color= "red", 
+             linetype = "dashed"))
+
+
+
+# Let's create QQ plots for total abundance.
+
+qqnorm(post_clean_div_pred$total_abundance)
+qqline(post_clean_div_pred$total_abundance)
+# Let's get the skewnewss coeffient for all the continous response variables.
+
+
+skewness(post_clean_div_pred$total_abundance, na.rm = TRUE)
+kurtosis(post_clean_div_pred$total_abundance,na.rm = TRUE)
+
+# Oh no! My data is skewed, but don't worry, we are not screwed!
+
+# If we want to be overkill, we can run a shapiro-wilk test for normality. If p>0.05, we reject the null hypothesis that the data is normally distributed.  W values close to 1 suggest normality. 
+shapiro.test(post_clean_div_pred$total_abundance)
+
+
+```
+
+So we have determined via our histogram that the data is right skewed. QQ plots confirmed our data diverges from normality, skewness coefficient told us that our data is positively skewed, and the shapiro-wilk test confirmed our data is NOT normal.
+
+2b) Identify and remove any duplicates. Deal w/NA values...
+
+```{r}
+# You may have noticed that in the code chunk above I added  '.na.rm = TRUE' when I called teh skewness function. Try removing the na.rm = True chunk and rerun the skewness function.
+
+# Identify and remove duplicates in dataset
+
+duplicated(post_clean_div_pred)
+sum(duplicated(post_clean_div_pred))
+
+# Deal w/NA values 
+sum(is.na(post_clean_div_pred))
+na_positions <- which(is.na(post_clean_div_pred), arr.ind= TRUE)
+print(na_positions)
+
+# Oopsies! There are two rows with NA values. For now let's omit them so it doesn't make our models messy. 
+post_clean_div_pred <- post_clean_div_pred[-c(3,37), ]
+
+print(post_clean_div_pred)
+
+sum(is.na(post_clean_div_pred))
+
+```
+
+3.  What happens if we run a Gaussian linear model on this data? Predictor will be LiDAR DSM 60 ( absolute value of shrub volume loss calculated w/lidar data) and response will be total abundance.
+
+    ```{r}
+    str(post_clean_div_pred)
+
+    post_clean_div_pred <- post_clean_div_pred %>%
+      mutate(lidar_dsm_60 = as.numeric(as.character(lidar_dsm_60)))
+
+
+
+    model_untransformed_total_a <- lm(total_abundance ~ lidar_dsm_60, 
+                                      data = post_clean_div_pred,
+                                      na.action = na.omit)
+    summary(model_untransformed_total_a)
+    ```
+
+    So we didn't get a significant p-value, but we do see a pretty strong negative association between lidar_dsm_60 and total abundance.
+
+<!-- -->
+
+4.  Ok, so our data is non-normal, what do we do now?
+
+    - Is it positive and right-skewed? Then try ln() transformation.
+
+    - Is it positive and left-skewed? Try boxcox.
+
+    - Is it negative or full of zeroes? Try Yeo-Johnson transformation.
+
+    - Nothing working?!?! Switch to a non-parametric GLM, but still need to understand your data distribution...
+
+    ```{r}
+    transformed_total_a <- log10(post_clean_div_pred$total_abundance)
+    ```
+
+5.  Let's plot our transformed data set.
+
+    ```{r}
+    # histogram of tranformed 
+    transformed_total_a_hist <- ggplot(
+      post_clean_div_pred,
+      aes(x = log10(total_abundance))
+    ) +
+      geom_histogram(
+        binwidth = 0.2,
+        fill = "cornflowerblue",
+        color = "black"
+      ) +
+      labs(
+        title = "Histogram of Transformed Total Abundance",
+        x = "Log10-transformed total abundance",
+        y = "Count"
+      ) +
+      theme_minimal()
+
+    print(transformed_total_a_hist)
+              
+      
+
+    # let's overlay the normal distrubtution onto our tranformed data.
+    ggarrange(
+      ggdensity(transformed_total_a, fill = "cornflowerblue", title = "log10 of total abundance")+
+        stat_overlay_normal_density(color= "red", linetype = "dashed")
+    )
+
+
+
+    # Let's create QQ plots for all of the continuous response variables. 
+
+    qqnorm(log10(post_clean_div_pred$total_abundance))
+    qqline(log10(post_clean_div_pred$total_abundance))
+
+    # Let's get the skewnewss coeffient for all the continous response variables.
+
+    skewness(transformed_total_a)
+    kurtosis(transformed_total_a)
+
+    # If we want to be overkill, we can run a shapiro-wilk test for normality. If p>0.05, the data is non-normal.
+
+    shapiro.test(transformed_total_a)
+
+
+    ```
+
+    6.  Oof. Our data looks a lot more normal, but shapiro-wilk is telling us that it is still non-normal. Let's do a boxcox transformation to find the ideal lambda. Note how I never ln transformed the actual column in post_clean_div_pred, I created a new object or applied the function within the function.
+
+        ```{r}
+        # let's fit a linear model with UNTRANSFORMED data
+
+        bx_model <- lm(total_abundance ~ lidar_dsm_60, data= post_clean_div_pred)
+
+        # apply box-cox tranformation
+        bxcx_result <- boxcox(bx_model)
+        #plot the result
+        plot(bxcx_result)
+
+        ```
+
+        ```{}
+        ```
+
+    7.  Now that our data is normally distributed, let's rerun our models!
+
+    ```{r}
+    tranformed_lm <-lm( transformed_total_a ~ post_clean_div_pred$lidar_dsm_60)
+
+    # compare this lm with transformed data to your non-transformed data. Were there any type 1 or 2 errors using your non-tranformed data in normal linear model?
+
+    # plot if if you want!
+
+    ```
