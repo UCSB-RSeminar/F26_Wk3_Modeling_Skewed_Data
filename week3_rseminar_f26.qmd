@@ -58,6 +58,7 @@ ggarrange(
 
 qqnorm(post_clean_div_pred$total_abundance)
 qqline(post_clean_div_pred$total_abundance)
+
 # Let's get the skewnewss coeffient for all the continous response variables.
 
 
@@ -120,9 +121,9 @@ sum(is.na(post_clean_div_pred))
 
 4.  Ok, so our data is non-normal, what do we do now?
 
-    - Is it positive and right-skewed? Then try ln() transformation.
+    - Is it positive and moderately rigfht right-skewed? Then try ln() transformation.
 
-    - Is it positive and left-skewed? Try boxcox.
+    - Is it positive and skewed? Try boxcox.
 
     - Is it negative or full of zeroes? Try Yeo-Johnson transformation.
 
